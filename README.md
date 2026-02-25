@@ -201,3 +201,24 @@ docker network inspect <имя_сети_проекта>
 
 - **Сборка обрывается без явной ошибки**  
   Перезапустить Docker Desktop и повторить `docker compose up -d --build`.
+
+## Git: удалённый репозиторий и коммиты
+
+**Подключить GitHub/GitLab (один раз):**
+
+1. Создайте пустой репозиторий на GitHub или GitLab (без README, без .gitignore).
+2. Подставьте его URL в команды и выполните из корня проекта:
+   ```bash
+   git remote add origin https://github.com/USER/REPO.git
+   git branch -M main
+   git push -u origin main
+   ```
+   Или для SSH: `git remote add origin git@github.com:USER/REPO.git`
+
+**Локальные коммиты:**
+   ```bash
+   git add .
+   git status
+   git commit -m "Описание изменений"
+   git push
+   ```
