@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SEO AI Agent — Твой лучший HR</title>
+  <style>
+    :root { --bg: #0f1419; --card: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 1.5rem; line-height: 1.5; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    nav { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    nav a { color: var(--accent); text-decoration: none; }
+    nav a:hover { text-decoration: underline; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+    .status { color: #3fb950; }
+    code { background: var(--border); padding: 0.2em 0.4em; border-radius: 4px; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <h1>SEO AI Agent</h1>
+  <p class="sub">Твой лучший HR — генерация SEO-статей (MVP)</p>
+  <nav>
+    <a href="/admin">Админ</a>
+    <a href="/docs">API Docs</a>
+    <a href="/health">Health</a>
+    <a href="/clusters">Clusters (API)</a>
+    <a href="/articles">Articles (API)</a>
+    <a href="/settings">Settings (API)</a>
+  </nav>
+  <div class="card">
+    <strong>Запуск ежедневной генерации</strong>
+    <p>POST <code>/jobs/run_daily</code> с телом <code>{"dry_run": true}</code> — постановка задачи в очередь. Dry-run: генерировать без публикации.</p>
+  </div>
+  <div class="card">
+    <span class="status">●</span> Режим публикации: SEMI (черновик + утверждение) или AUTO — настраивается в Settings <code>publish_mode</code>.
+  </div>
+</body>
+</html>

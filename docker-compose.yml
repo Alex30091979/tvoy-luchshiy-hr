@@ -1,0 +1,131 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: seo
+      POSTGRES_PASSWORD: seo
+      POSTGRES_DB: seo_agent
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  orchestrator-api:
+    build: .
+    command: uvicorn services.orchestrator_api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://seo:seo@postgres:5432/seo_agent
+      DATABASE_URL_SYNC: postgresql://seo:seo@postgres:5432/seo_agent
+      REDIS_URL: redis://redis:6379/0
+      SERP_INTEL_URL: http://serp-intel:8000
+      CONTENT_GEN_URL: http://content-gen:8000
+      SEO_OPTIMIZER_URL: http://seo-optimizer:8000
+      QUALITY_GATE_URL: http://quality-gate:8000
+      PUBLISHER_TILDA_URL: http://publisher-tilda:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  scheduler-worker:
+    build: .
+    command: python services/scheduler_worker/run_worker.py
+    environment:
+      DATABASE_URL_SYNC: postgresql://seo:seo@postgres:5432/seo_agent
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      orchestrator-api:
+        condition: service_started
+
+  serp-intel:
+    build: .
+    command: uvicorn services.serp_intel.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8001:8000"
+    depends_on:
+      - redis
+
+  content-gen:
+    build: .
+    command: uvicorn services.content_gen.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8002:8000"
+    depends_on:
+      - redis
+
+  seo-optimizer:
+    build: .
+    command: uvicorn services.seo_optimizer.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8003:8000"
+
+  quality-gate:
+    build: .
+    command: uvicorn services.quality_gate.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8004:8000"
+
+  publisher-tilda:
+    build: .
+    command: uvicorn services.publisher_tilda.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8005:8000"
+
+  indexer:
+    build: .
+    command: uvicorn services.indexer.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8006:8000"
+
+  analytics-tracker:
+    build: .
+    command: uvicorn services.analytics_tracker.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8007:8000"
+
+  linkbuilding:
+    build: .
+    command: uvicorn services.linkbuilding.main:app --host 0.0.0.0 --port 8000
+    environment:
+      DATABASE_URL_SYNC: postgresql://seo:seo@postgres:5432/seo_agent
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8008:8000"
+
+  cases-gen:
+    build: .
+    command: uvicorn services.cases_gen.main:app --host 0.0.0.0 --port 8000
+    environment:
+      DATABASE_URL_SYNC: postgresql://seo:seo@postgres:5432/seo_agent
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8009:8000"
+
+volumes:
+  pgdata: {}

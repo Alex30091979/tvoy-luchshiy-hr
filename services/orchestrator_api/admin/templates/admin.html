@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Админ — SEO AI Agent</title>
+  <style>
+    :root { --bg: #0f1419; --card: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; --green: #3fb950; --red: #f85149; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 1rem; line-height: 1.5; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1.1rem; margin: 1rem 0 0.5rem; color: var(--muted); }
+    .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem; }
+    nav { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    nav a { color: var(--accent); text-decoration: none; }
+    nav a:hover { text-decoration: underline; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+    .row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    label { min-width: 140px; }
+    select, input[type="number"] { padding: 0.35rem 0.5rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+    button { padding: 0.4rem 0.8rem; border-radius: 4px; border: 1px solid var(--accent); background: var(--accent); color: var(--bg); cursor: pointer; }
+    button.secondary { background: transparent; color: var(--accent); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { padding: 0.4rem 0.5rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 500; }
+    .status-ok { color: var(--green); }
+    .status-fail { color: var(--red); }
+    .status-pending { color: var(--muted); }
+    #msg { margin-top: 0.5rem; font-size: 0.85rem; }
+    pre { background: var(--bg); padding: 0.75rem; border-radius: 4px; overflow-x: auto; font-size: 0.8rem; }
+    .toggle { display: inline-flex; align-items: center; gap: 0.35rem; }
+  </style>
+</head>
+<body>
+  <h1>Админ-терминал</h1>
+  <p class="sub">SEO AI Agent — Твой лучший HR</p>
+  <nav>
+    <a href="/">Главная</a>
+    <a href="/docs">API Docs</a>
+    <a href="/health">Health</a>
+  </nav>
+
+  <div class="card">
+    <h2>Режим публикации</h2>
+    <div class="row">
+      <label>Режим</label>
+      <select id="mode">
+        <option value="semi">SEMI — черновик + утверждение</option>
+        <option value="auto">AUTO — автопубликация</option>
+      </select>
+      <button type="button" id="saveMode">Сохранить</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Лимиты</h2>
+    <div class="row">
+      <label>Статей в день</label>
+      <input type="number" id="articlesPerDay" min="1" max="10" value="1" />
+      <button type="button" id="saveArticlesPerDay">Сохранить</button>
+    </div>
+    <div class="row">
+      <label>Доля Москва (0–1)</label>
+      <input type="number" id="moscowShare" min="0" max="1" step="0.1" value="0.7" />
+      <button type="button" id="saveMoscowShare">Сохранить</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Кластеры (вкл/выкл)</h2>
+    <div id="clustersList">Загрузка…</div>
+  </div>
+
+  <div class="card">
+    <h2>Очередь задач</h2>
+    <button type="button" id="runDaily" class="secondary">Запустить ежедневную генерацию (dry-run)</button>
+    <div id="jobsList">Загрузка…</div>
+  </div>
+
+  <div class="card">
+    <h2>Статьи</h2>
+    <div id="articlesList">Загрузка…</div>
+  </div>
+
+  <div class="card">
+    <h2>Quality report (последняя статья)</h2>
+    <pre id="qualityReport">—</pre>
+  </div>
+
+  <div id="msg"></div>
+
+  <script>
+    const API = '';
+    function msg(t, isErr) {
+      const el = document.getElementById('msg');
+      el.textContent = t;
+      el.className = isErr ? 'status-fail' : 'status-ok';
+    }
+
+    async function get(path) {
+      const r = await fetch(API + path);
+      if (!r.ok) throw new Error(r.status + ' ' + path);
+      return r.json();
+    }
+    async function post(path, body) {
+      const r = await fetch(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+      if (!r.ok) throw new Error(r.status + ' ' + path);
+      return r.json();
+    }
+    async function patch(path, body) {
+      const r = await fetch(API + path, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+      if (!r.ok) throw new Error(r.status + ' ' + path);
+      return r.json();
+    }
+
+    function loadSettings() {
+      return get('/settings').then(items => {
+        items.forEach(s => {
+          if (s.key === 'publish_mode') document.getElementById('mode').value = s.value || 'semi';
+          if (s.key === 'articles_per_day') document.getElementById('articlesPerDay').value = s.value || '1';
+          if (s.key === 'moscow_share') document.getElementById('moscowShare').value = s.value || '0.7';
+        });
+      });
+    }
+
+    document.getElementById('saveMode').onclick = () => {
+      post('/settings', { key: 'publish_mode', value: document.getElementById('mode').value }).then(() => msg('Режим сохранён')).catch(e => msg(e.message, true));
+    };
+    document.getElementById('saveArticlesPerDay').onclick = () => {
+      post('/settings', { key: 'articles_per_day', value: document.getElementById('articlesPerDay').value }).then(() => msg('Лимит сохранён')).catch(e => msg(e.message, true));
+    };
+    document.getElementById('saveMoscowShare').onclick = () => {
+      post('/settings', { key: 'moscow_share', value: String(document.getElementById('moscowShare').value) }).then(() => msg('Доля Москва сохранена')).catch(e => msg(e.message, true));
+    };
+
+    function loadClusters() {
+      get('/clusters').then(list => {
+        const div = document.getElementById('clustersList');
+        div.innerHTML = '<table><thead><tr><th>Вкл</th><th>Название</th><th>Регион</th><th>Slug</th></tr></thead><tbody></tbody></table>';
+        const tbody = div.querySelector('tbody');
+        list.forEach(c => {
+          const tr = document.createElement('tr');
+          const td0 = document.createElement('td');
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = c.is_active;
+          cb.onchange = () => patch('/clusters/' + c.id, { is_active: cb.checked }).then(() => msg('Кластер обновлён')).catch(e => msg(e.message, true));
+          td0.appendChild(cb);
+          tr.appendChild(td0);
+          tr.appendChild(document.createElement('td')).textContent = c.name;
+          tr.appendChild(document.createElement('td')).textContent = c.region;
+          tr.appendChild(document.createElement('td')).textContent = c.slug;
+          tbody.appendChild(tr);
+        });
+      }).catch(() => { document.getElementById('clustersList').textContent = 'Ошибка загрузки'; });
+    }
+
+    document.getElementById('runDaily').onclick = () => {
+      post('/jobs/run_daily', { dry_run: true }).then(() => { msg('Задача поставлена в очередь'); loadJobs(); }).catch(e => msg(e.message, true));
+    };
+
+    function loadJobs() {
+      get('/jobs').then(data => {
+        const div = document.getElementById('jobsList');
+        if (!data.items || !data.items.length) { div.innerHTML = 'Нет задач'; return; }
+        div.innerHTML = '<table><thead><tr><th>ID</th><th>Тип</th><th>Статус</th><th>Создан</th><th>Результат</th></tr></thead><tbody></tbody></table>';
+        const tbody = div.querySelector('tbody');
+        data.items.slice(0, 20).forEach(j => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = '<td>' + j.id + '</td><td>' + j.job_type + '</td><td class="status-' + (j.status === 'completed' ? 'ok' : j.status === 'failed' ? 'fail' : 'pending') + '">' + j.status + '</td><td>' + (j.created_at || '').slice(0, 19) + '</td><td>' + (j.result ? JSON.stringify(j.result).slice(0, 60) + '…' : '—') + '</td>';
+          tbody.appendChild(tr);
+        });
+      }).catch(() => { document.getElementById('jobsList').textContent = 'Ошибка загрузки'; });
+    }
+
+    function loadArticles() {
+      get('/articles?limit=30').then(data => {
+        const div = document.getElementById('articlesList');
+        if (!data.items || !data.items.length) { div.innerHTML = 'Нет статей'; return; }
+        div.innerHTML = '<table><thead><tr><th>ID</th><th>Заголовок</th><th>Статус</th><th>Создана</th><th>Действие</th></tr></thead><tbody></tbody></table>';
+        const tbody = div.querySelector('tbody');
+        data.items.forEach(a => {
+          const tr = document.createElement('tr');
+          const action = (a.status === 'draft' || a.status === 'pending_approval') ? '<button type="button" data-id="' + a.id + '" data-publish="true">Опубликовать</button>' : '—';
+          tr.innerHTML = '<td>' + a.id + '</td><td>' + (a.title || '—').slice(0, 50) + '</td><td>' + a.status + '</td><td>' + (a.created_at || '').slice(0, 19) + '</td><td>' + action + '</td>';
+          tbody.appendChild(tr);
+          const btn = tr.querySelector('button');
+          if (btn) btn.onclick = () => post('/articles/' + a.id + '/approve', { publish: true }).then(() => { msg('Статья утверждена'); loadArticles(); loadQuality(); }).catch(e => msg(e.message, true));
+        });
+      }).catch(() => { document.getElementById('articlesList').textContent = 'Ошибка загрузки'; });
+    }
+
+    function loadQuality() {
+      get('/articles?limit=1').then(data => {
+        if (data.items && data.items[0] && data.items[0].quality_scores) {
+          document.getElementById('qualityReport').textContent = JSON.stringify(data.items[0].quality_scores, null, 2);
+        } else {
+          get('/articles?limit=5').then(d2 => {
+            const withQ = (d2.items || []).find(a => a.quality_scores);
+            document.getElementById('qualityReport').textContent = withQ ? JSON.stringify(withQ.quality_scores, null, 2) : 'Нет данных';
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+
+    loadSettings();
+    loadClusters();
+    loadJobs();
+    loadArticles();
+    loadQuality();
+    setInterval(loadJobs, 10000);
+  </script>
+</body>
+</html>
