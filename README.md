@@ -15,7 +15,9 @@
 
 ## Как запустить
 
-1. Клонировать репозиторий и перейти в каталог проекта.  
+**Где работать с кодом:** основной каталог проекта — `...\Твой лучший HR.SEO-накрутка`. Сборку Docker на Windows из этой папки может ломать путь с кириллицей; тогда копируйте проект в папку только с латиницей (см. ниже) и запускайте `docker compose` оттуда. Исходный код и git по‑прежнему ведите в основной папке.
+
+1. Клонировать репозиторий (или открыть существующий каталог) и перейти в каталог проекта.  
    **Важно для Windows:** если при сборке появляется ошибка `x-docker-expose-session-sharedkey contains value with non-printable ASCII characters`, скопируйте проект в путь **только из латиницы** (например `C:\projects\seo-agent`) и запускайте `docker compose` оттуда — путь с кириллицей («Мой диск», «Твой лучший HR» и т.п.) может ломать gRPC Docker Desktop.  
    В PowerShell копирование из текущей папки проекта:
    ```powershell
@@ -202,23 +204,75 @@ docker network inspect <имя_сети_проекта>
 - **Сборка обрывается без явной ошибки**  
   Перезапустить Docker Desktop и повторить `docker compose up -d --build`.
 
-## Git: удалённый репозиторий и коммиты
+## Рабочий каталог и репозитории
 
-**Подключить GitHub/GitLab (один раз):**
+**Основной код всегда хранится здесь:**
+- `C:\Users\a.ramensky\Мой диск\Google_Scripts\Твой лучший HR.SEO-накрутка` — единственный источник правды: в этой папке правки, коммиты и история.
 
-1. Создайте пустой репозиторий на GitHub или GitLab (без README, без .gitignore).
-2. Подставьте его URL в команды и выполните из корня проекта:
+**GitHub и GitLab** — для деплоя и защиты авторского права (бэкап, даты коммитов):
+- Все изменения делайте в папке выше, коммитьте и пушите в удалённые репозитории.
+- Деплой: на сервере или в CI делают `git clone` из GitHub/GitLab и собирают/запускают проект; локально для Docker при необходимости клонируют в каталог с путём только из латиницы (например `C:\Projects\seo-agent`).
+
+**Типовой цикл работы:**
    ```bash
-   git remote add origin https://github.com/USER/REPO.git
-   git branch -M main
-   git push -u origin main
-   ```
-   Или для SSH: `git remote add origin git@github.com:USER/REPO.git`
-
-**Локальные коммиты:**
-   ```bash
+   cd "C:\Users\a.ramensky\Мой диск\Google_Scripts\Твой лучший HR.SEO-накрутка"
    git add .
    git status
    git commit -m "Описание изменений"
-   git push
+   git push origin main
    ```
+   При добавлении GitLab как второго remote:
+   ```bash
+   git remote add gitlab https://gitlab.com/USER/REPO.git
+   git push -u gitlab main
+   ```
+   Дальше после каждого коммита можно пушить в оба: `git push origin main && git push gitlab main`.
+
+**Почему коммиты «Unverified» и как сделать Verified**
+
+GitHub показывает «Unverified», если коммит не подписан. Чтобы коммиты были **Verified**:
+
+1. **Подпись коммитов по SSH (рекомендуется)**  
+   - Убедитесь, что у вас есть SSH-ключ и он добавлен в GitHub: Settings → SSH and GPG keys.  
+   - Включите подписание коммитов этим ключом и укажите его в git:
+   ```bash
+   git config --global gpg.format ssh
+   git config --global user.signingkey "ПУТЬ_К_ПУБЛИЧНОМУ_КЛЮЧУ"
+   git config --global commit.gpgsign true
+   ```
+   Вместо пути к ключу подставьте путь к вашему **публичному** SSH-ключу (например `~/.ssh/id_ed25519.pub` или `C:\Users\USERNAME\.ssh\id_ed25519.pub`).  
+   - В GitHub: Settings → SSH and GPG keys → New SSH key → **Signing Key** — вставьте тот же публичный ключ и отметьте «Use for commit signing».  
+   - Новые коммиты будут подписаны. Старые коммиты останутся Unverified; при желании можно переписать историю с подписью (`git rebase` и т.п., осторожно при уже запушенной истории).
+
+2. **Подпись коммитов по GPG**  
+   - Установите GPG (например [Gpg4win](https://www.gpg4win.org/)), создайте ключ: `gpg --full-generate-key`.  
+   - Узнайте ID ключа: `gpg --list-secret-keys --keyid-format long`.  
+   - В git: `git config --global user.signingkey ID_КЛЮЧА`, `git config --global commit.gpgsign true`.  
+   - Экспорт публичного ключа: `gpg --armor --export ID_КЛЮЧА`, скопируйте вывод.  
+   - В GitHub: Settings → SSH and GPG keys → New GPG key — вставьте ключ.  
+   - Новые коммиты станут Verified.
+
+После настройки все **новые** коммиты будут отображаться как Verified. Уже существующие коммиты на GitHub не переведутся в Verified автоматически.
+
+## Что делать дальше
+
+1. **Проверить пайплайн из коробки**  
+   Код правите в основной папке (`Твой лучший HR.SEO-накрутка`). Для запуска Docker скопируйте проект в папку с латиницей (например `C:\Projects\seo-agent`) или сделайте там `git clone` с GitHub, затем:
+   ```powershell
+   docker compose up -d --build
+   docker compose run --rm orchestrator-api alembic -c alembic.ini upgrade head
+   docker compose run --rm orchestrator-api python -c "from libs.common.seed_data import run_seed; run_seed()"
+   ```
+   Открыть http://localhost:8000/admin, нажать «Запустить ежедневную генерацию», проверить статью в списке и quality report.
+
+2. **Подключить реальные API**  
+   Вместо заглушек: выдать ключи SERP, LLM, Tilda (в .env или в настройках), реализовать клиенты в `libs/common/clients/` и в сервисах (serp-intel, content-gen, publisher-tilda).
+
+3. **Автозапуск раз в день**  
+   Настроить cron/systemd (на сервере) или RQ Scheduler / отдельный scheduler-сервис, который раз в сутки вызывает `POST /jobs/run_daily`.
+
+4. **Мониторинг и прод**  
+   Логи (JSON + ротация), метрики, алерты; вынести конфиг в env; при необходимости — Kubernetes/Helm или отдельные инстансы сервисов.
+
+5. **Через 6 месяцев: Update Engine**  
+   Реализовать пайплайн обновления статей (по расписанию или по триггеру), используя заложенные таблицы и `JobType.UPDATE_ARTICLE`.
