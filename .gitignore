@@ -20,3 +20,4 @@ htmlcov/
 .vscode/
 *.db
 *.sqlite
+my-gpg-public-key.asc
